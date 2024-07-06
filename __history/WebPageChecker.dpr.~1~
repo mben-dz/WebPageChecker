@@ -1,0 +1,109 @@
+program WebPageChecker;
+
+uses
+  System.SysUtils,
+  System.Classes,
+  Winapi.Windows,
+  Winapi.WinInet,
+  MMSystem;
+
+// for sound notification
+
+type
+  IWebChecker = interface
+    ['{BFD50782-8B7F-4D20-9318-22BFA8F8E6D2}']
+    function SetURL(const AURL: string): IWebChecker;
+    function CheckService: IWebChecker;
+    function DisplayProgress: IWebChecker;
+    function Notify: IWebChecker;
+  end;
+
+  TWebChecker = class(TInterfacedObject, IWebChecker)
+  private
+    FURL: string;
+    FServiceOpen: Boolean;
+  public
+    function SetURL(const AURL: string): IWebChecker;
+    function CheckService: IWebChecker;
+    function DisplayProgress: IWebChecker;
+    function Notify: IWebChecker;
+  end;
+
+function TWebChecker.SetURL(const AURL: string): IWebChecker;
+begin
+  FURL := AURL;
+  Result := Self;
+end;
+
+function TWebChecker.CheckService: IWebChecker;
+var
+  hInet, hUrl: HINTERNET;
+begin
+  FServiceOpen := False;
+  hInet := InternetOpen('WebChecker', INTERNET_OPEN_TYPE_PRECONFIG, nil, nil, 0);
+  if Assigned(hInet) then
+  try
+    hUrl := InternetOpenUrl(hInet, PChar(FURL), nil, 0, INTERNET_FLAG_RELOAD, 0);
+    if Assigned(hUrl) then
+    try
+      FServiceOpen := True;
+    finally
+      InternetCloseHandle(hUrl);
+    end;
+  finally
+    InternetCloseHandle(hInet);
+  end;
+  Result := Self;
+end;
+
+function TWebChecker.DisplayProgress: IWebChecker;
+const
+  TotalSteps = 10;
+var
+  i: Integer;
+begin
+  Write('Checking service');
+  for i := 1 to TotalSteps do
+  begin
+    Sleep(CHECK_INTERVAL div TotalSteps);
+    Write('.');
+  end;
+  WriteLn;
+  Result := Self;
+end;
+
+function TWebChecker.Notify: IWebChecker;
+begin
+  if FServiceOpen then
+  begin
+    Writeln('Service is OPEN!');
+    sndPlaySound('C:\Windows\Media\Windows Ding.wav', SND_FILENAME or SND_ASYNC);
+  end
+  else
+  begin
+    Writeln('Service is CLOSED.');
+  end;
+  Result := Self;
+end;
+
+const
+  CHECK_INTERVAL = 3000; // 3 seconds
+
+var
+  WebChecker: IWebChecker;
+  URL: string;
+begin
+  Writeln('Web Page Service Checker');
+  Write('Enter URL to check: ');
+  Readln(URL);
+
+  WebChecker := TWebChecker.Create;
+  while True do
+  begin
+    WebChecker.SetURL(URL)
+               .DisplayProgress
+               .CheckService
+               .Notify;
+    Sleep(CHECK_INTERVAL);
+  end;
+end.
